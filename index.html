@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#06070c">
+<title>Смена — симулятор экструзионной линии</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#06070c;
+  --text:#eef2ff; --mute:rgba(226,232,255,.62); --dim:rgba(226,232,255,.36);
+  --line:rgba(160,175,255,.16); --panel:rgba(255,255,255,.055);
+  --ok:#2ee6a6; --warn:#ffb020; --alarm:#ff4d5e; --lock:#a58bff; --cy:#39c6ff;
+  --grad:linear-gradient(120deg,#22b8ff 0%,#5b6bff 50%,#c14bff 100%);
+  --f:'Inter',Arial,Helvetica,sans-serif;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:var(--f);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:-2;display:block}
+.veil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(130% 90% at 50% 30%,transparent 30%,rgba(6,7,12,.7) 100%)}
+.app{max-width:560px;margin:0 auto;padding:16px 18px 60px;min-height:100vh;display:flex;flex-direction:column;gap:14px}
+.screen{display:none;flex-direction:column;gap:16px}
+.screen.on{display:flex;animation:enter .4s ease both}
+@keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+button{font-family:var(--f)}
+.btn{font:800 16px/1.1 var(--f);letter-spacing:-.01em;border:0;border-radius:999px;padding:17px 22px;min-height:54px;color:var(--text);cursor:pointer;transition:transform .15s,opacity .2s;text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.tile:focus-visible,.tabs button:focus-visible,.spd button:focus-visible,.chip:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+.btn.primary{background:var(--grad);color:#fff;box-shadow:0 14px 30px -12px rgba(91,107,255,.9),inset 0 1px 0 rgba(255,255,255,.25)}
+.btn.ghost{background:var(--panel);border:1px solid var(--line)}
+.btn.danger{background:rgba(255,77,94,.16);border:1.5px solid rgba(255,77,94,.6);color:#ffb3bb}
+.btn.lock{background:rgba(165,139,255,.16);border:1.5px solid rgba(165,139,255,.6);color:#d9ccff}
+.btn.link{background:none;color:var(--mute);padding:10px;min-height:44px;font-weight:700}
+.btn[disabled]{opacity:.35;pointer-events:none}
+.btn.big{width:100%;font-size:18px;padding:20px}
+.row{display:flex;gap:10px}.row .btn{flex:1;padding-left:10px;padding-right:10px}
+
+/* старт */
+.brand{font-weight:900;font-size:40px;letter-spacing:-.07em;background:linear-gradient(110deg,#fff,#8db4ff 55%,#d59bff);-webkit-background-clip:text;background-clip:text;color:transparent;margin:0}
+.lead{margin:0;color:var(--mute);font-size:16px;font-weight:500}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:16px 18px}
+.card h3{margin:0 0 8px;font-size:15px;font-weight:800;letter-spacing:-.02em}
+.card ul{margin:0;padding-left:18px;color:var(--mute);font-size:14.5px;font-weight:500;display:grid;gap:4px}
+.card b{color:var(--text)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:800 14px/1 var(--f);padding:12px 16px;border-radius:99px;border:1.5px solid var(--line);background:none;color:var(--mute);cursor:pointer}
+.chip.on{background:var(--text);color:#0b0c14;border-color:var(--text)}
+.best{font-size:13.5px;color:var(--mute);font-weight:600}
+
+/* игра: шапка */
+.gh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gh .b{font-weight:900;font-size:24px;letter-spacing:-.06em}
+.clock{font-weight:900;font-size:26px;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1}
+.clock small{display:block;font-size:11.5px;font-weight:700;letter-spacing:0;color:var(--mute);margin-top:2px}
+.spd{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:3px}
+.spd button{border:0;background:none;color:var(--mute);font:800 13px/1 var(--f);padding:9px 11px;border-radius:99px;min-width:38px;cursor:pointer}
+.spd button.on{background:var(--text);color:#0b0c14}
+.banner{border-radius:20px;padding:12px 16px;display:grid;gap:2px;border:1.5px solid var(--line);background:var(--panel);transition:background .3s,border-color .3s}
+.banner b{font-size:15px;font-weight:900;letter-spacing:.01em}
+.banner span{font-size:13.5px;color:var(--mute);font-weight:500}
+.banner.run{border-color:rgba(46,230,166,.5);background:rgba(46,230,166,.09)}.banner.run b{color:var(--ok)}
+.banner.trip,.banner.inc{border-color:rgba(255,77,94,.7);background:rgba(255,77,94,.13);animation:blink 1.4s ease-in-out infinite}.banner.trip b,.banner.inc b{color:#ff8b97}
+.banner.lck{border-color:rgba(165,139,255,.6);background:rgba(165,139,255,.12)}.banner.lck b{color:#cbb9ff}
+@keyframes blink{50%{background:rgba(255,77,94,.06)}}
+.job{border-radius:18px;background:rgba(165,139,255,.12);border:1px solid rgba(165,139,255,.5);padding:12px 16px;display:grid;gap:8px}
+.job b{font-size:14.5px;font-weight:800}
+.prog{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--lock);width:0;transition:width .25s}
+.kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi .k{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:10px 14px}
+.kpi .k span{font-size:12px;font-weight:700;color:var(--mute);display:block}
+.kpi .k b{font-size:30px;font-weight:900;letter-spacing:-.05em;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .k b small{font-size:14px;font-weight:800;color:var(--dim);letter-spacing:0;margin-left:2px}
+.kpi .k .prog{margin-top:6px}.kpi .k .prog i{background:var(--cy)}
+.tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:3px}
+.tabs button{flex:1;border:0;background:none;color:var(--mute);font:800 13.5px/1 var(--f);padding:12px 4px;border-radius:99px;cursor:pointer}
+.tabs button.on{background:var(--text);color:#0b0c14}
+.tab{display:none;flex-direction:column;gap:14px}.tab.on{display:flex}
+
+/* линия */
+.plant{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:6px}
+.plant svg{width:100%;height:auto;display:block}
+.blk{fill:rgba(255,255,255,.06);stroke:var(--ok);stroke-width:1.4;transition:stroke .3s,fill .3s;cursor:pointer}
+.st-warn .blk{stroke:var(--warn);fill:rgba(255,176,32,.14)}
+.st-alarm .blk{stroke:var(--alarm);fill:rgba(255,77,94,.22)}
+.st-alarm{animation:pl 1s ease-in-out infinite}
+@keyframes pl{50%{opacity:.55}}
+.lbl{font:700 7px var(--f);fill:rgba(226,232,255,.6);pointer-events:none;text-anchor:middle}
+.pipe{stroke:#39c6ff;stroke-width:1.2;stroke-dasharray:3 3;fill:none;opacity:.6}
+.sheetline{stroke:#dbe6ff;stroke-width:2.2;fill:none;stroke-dasharray:6 4}
+.alarms{display:flex;flex-direction:column;gap:8px}
+.al{display:flex;align-items:center;gap:10px;border-radius:16px;padding:11px 14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;text-align:left;color:var(--text);font:600 14px/1.35 var(--f);width:100%}
+.al i{width:10px;height:10px;border-radius:50%;flex:none}
+.al.warn{border-color:rgba(255,176,32,.5)}.al.warn i{background:var(--warn)}
+.al.alarm{border-color:rgba(255,77,94,.6);background:rgba(255,77,94,.1)}.al.alarm i{background:var(--alarm)}
+.al b{font-weight:800}
+.calm{margin:0;font-size:14px;color:var(--ok);font-weight:600}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{-webkit-appearance:none;appearance:none;text-align:left;color:var(--text);background:var(--panel);border:1.5px solid var(--line);border-radius:20px;padding:12px 14px;cursor:pointer;display:grid;gap:1px;position:relative;transition:border-color .3s,background .3s}
+.tile:active{transform:scale(.98)}
+.tile .tn{font-size:12.5px;font-weight:700;color:var(--mute);padding-right:16px}
+.tile .tv{font-size:24px;font-weight:900;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .ts{font-size:12px;color:var(--dim);font-weight:600;min-height:1.2em}
+.tile::after{content:"";position:absolute;top:14px;right:14px;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px currentColor;color:var(--ok)}
+.tile.warn{border-color:rgba(255,176,32,.6);background:rgba(255,176,32,.08)}.tile.warn::after{background:var(--warn);color:var(--warn)}
+.tile.alarm{border-color:rgba(255,77,94,.75);background:rgba(255,77,94,.12)}.tile.alarm::after{background:var(--alarm);color:var(--alarm)}
+
+/* пульт */
+.hint{font-size:13.5px;color:var(--mute);font-weight:500;margin:0}
+.pred{border-radius:20px;padding:14px 16px;background:linear-gradient(135deg,rgba(57,198,255,.16),rgba(193,75,255,.12));border:1px solid var(--line)}
+.pred b{font-size:28px;font-weight:900;letter-spacing:-.05em}
+.pred span{display:block;font-size:13px;color:var(--mute);font-weight:600}
+.sl{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:12px 16px 8px}
+.sl .h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sl .h span{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.sl .h b{font-size:20px;font-weight:900;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.sl .h b small{font-size:12px;color:var(--dim);font-weight:700;margin-left:2px}
+.sl input[type=range]{width:100%;accent-color:#7b7cff;height:32px;margin:2px 0}
+.sl .f{font-size:12.5px;color:var(--mute);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.sl .f em{font-style:normal;color:var(--dim)}
+
+/* толщина */
+.bigread{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.bigread b{font-size:clamp(56px,18vw,84px);font-weight:900;letter-spacing:-.07em;font-variant-numeric:tabular-nums;line-height:.95}
+.bigread span{font-size:14px;color:var(--mute);font-weight:600}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:10px 8px 6px}
+.chart svg{width:100%;height:auto;display:block}
+.chart p{margin:2px 8px 4px;font-size:12.5px;color:var(--mute);font-weight:500}
+.bar{cursor:pointer}
+.tg{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 16px}
+.tg span{font-size:14.5px;font-weight:800;letter-spacing:-.01em}.tg small{display:block;font-size:12.5px;color:var(--mute);font-weight:500}
+.sw{width:52px;height:30px;border-radius:30px;background:rgba(255,255,255,.14);border:0;position:relative;cursor:pointer;flex:none;transition:background .25s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .25s}
+.sw.on{background:var(--ok)}.sw.on::after{transform:translateX(22px)}
+
+/* журнал */
+.lg{display:grid;gap:0}
+.li{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:500}
+.li time{font-variant-numeric:tabular-nums;color:var(--dim);font-weight:700;font-size:13px}
+.li i{width:8px;height:8px;border-radius:50%;background:var(--dim);transform:translateY(-1px)}
+.li.warn i{background:var(--warn)}.li.alarm i{background:var(--alarm)}.li.ok i{background:var(--ok)}.li.info i{background:var(--cy)}
+.li.alarm{color:#ffb3bb}
+
+/* окно */
+.back{position:fixed;inset:0;background:rgba(2,3,8,.66);z-index:20;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.back.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:560px;margin:0 auto;background:#0e1020;border:1px solid var(--line);border-bottom:0;border-radius:28px 28px 0 0;padding:18px 18px calc(22px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow:auto;transform:translateY(105%);transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.sheet.on{transform:none}
+.sheet .grip{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.2);margin:-6px auto 12px}
+.sheet h2{margin:0;font-size:24px;font-weight:900;letter-spacing:-.05em;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pill{font:800 11.5px/1 var(--f);letter-spacing:.02em;padding:6px 10px;border-radius:99px;background:rgba(46,230,166,.16);color:var(--ok)}
+.pill.warn{background:rgba(255,176,32,.18);color:var(--warn)}.pill.alarm{background:rgba(255,77,94,.2);color:#ff8b97}
+.rows{display:grid;margin:10px 0;border-top:1px solid var(--line)}
+.rw{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px;font-weight:600}
+.rw span{color:var(--mute)}.rw b{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.rw.warn b{color:var(--warn)}.rw.alarm b{color:#ff8b97}
+.tip{border-radius:16px;padding:12px 14px;background:rgba(57,198,255,.1);border:1px solid rgba(57,198,255,.3);font-size:13.5px;font-weight:500;color:#cfeaff;margin:6px 0 12px}
+.acts{display:grid;gap:8px}
+.acts .btn{justify-content:space-between;text-align:left;padding:15px 18px;font-size:15px}
+.acts .btn small{font-size:12.5px;font-weight:700;opacity:.75;white-space:nowrap}
+.steps{display:grid;gap:8px;margin:12px 0}
+.stp{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid var(--line);font-size:14.5px;font-weight:700;color:var(--mute)}
+.stp i{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);display:grid;place-items:center;font-style:normal;font-size:12px;flex:none}
+.stp.done{color:var(--ok)}.stp.done i{background:var(--ok);color:#06231a}
+.stp.cur{color:var(--text);border-color:rgba(165,139,255,.7);background:rgba(165,139,255,.12)}.stp.cur i{background:var(--lock);color:#150c33}
+.bad{background:rgba(255,77,94,.12);border:1px solid rgba(255,77,94,.6);border-radius:18px;padding:14px 16px;font-size:14.5px;font-weight:500;color:#ffd0d5;margin:10px 0}
+.bad b{display:block;font-size:18px;font-weight:900;letter-spacing:-.03em;color:#ff8b97;margin-bottom:4px}
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translate(-50%,-180%);background:#f4f6ff;color:#0b0c14;padding:11px 18px;border-radius:99px;font-size:13.5px;font-weight:800;z-index:40;transition:transform .35s cubic-bezier(.2,.7,.2,1);max-width:92vw;text-align:center}
+.toast.show{transform:translate(-50%,0)}
+
+/* итог */
+.endhero .big{font-weight:900;font-size:clamp(100px,34vw,170px);letter-spacing:-.08em;line-height:.85;background:linear-gradient(180deg,#fff 5%,#8db4ff 60%,#c14bff);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.endhero h2{margin:8px 0 0;font-size:28px;font-weight:900;letter-spacing:-.05em}
+.endhero p{margin:6px 0 0;color:var(--mute);font-weight:600;font-size:14.5px}
+.apq{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.apq div b{display:block;font-size:26px;font-weight:900;letter-spacing:-.05em}.apq div span{font-size:12.5px;font-weight:700;color:var(--mute)}
+.sec{border-top:1px solid var(--line);padding-top:18px;display:grid;gap:12px}
+.sec h3{margin:0;font-size:18px;font-weight:900;letter-spacing:-.04em}
+.lb{display:grid;gap:10px}.lb div{display:grid;gap:4px}
+.lb .t{display:flex;justify-content:space-between;font-size:14.5px;font-weight:700}
+.lb .t b{font-variant-numeric:tabular-nums}
+.lb .g{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden}.lb .g i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#ffb020,#ff4d5e)}
+.tl{display:flex;gap:2px;height:30px}.tl i{flex:1;border-radius:3px;background:rgba(255,255,255,.12)}
+.tl i.ok{background:var(--ok)}.tl i.mid{background:var(--warn)}.tl i.stop{background:var(--alarm)}.tl i.lck{background:var(--lock)}
+.tlg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mute);font-weight:600}.tlg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--c)}
+.rv{display:grid;gap:8px}.rv div{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;font-weight:500;color:var(--mute)}.rv b{display:block;color:var(--text);font-size:15px;font-weight:800;letter-spacing:-.02em}
+.les{margin:0;padding:0;list-style:none;display:grid;gap:10px}.les li{padding:14px 16px;border-radius:18px;background:linear-gradient(90deg,rgba(91,107,255,.2),rgba(91,107,255,.04));font-size:14.5px;font-weight:500;color:var(--mute)}.les li b{display:block;color:var(--text);font-size:16px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="back" id="back"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grip"></div><div id="sheetBody"></div></div>
+
+<div class="app">
+  <!-- СТАРТ -->
+  <section class="screen on" id="s-start">
+    <h1 class="brand">Смена</h1>
+    <p class="lead">Ты оператор линии по производству листа из полипропилена для термоформовки. Восемь часов смены, заказ 3 000 кг годного листа. Держи качество, реагируй на неисправности и не нарушай технику безопасности.</p>
+    <div class="card"><h3>Что за линия</h3>
+      <ul><li>Бункер и дозатор, шнек и цилиндр, главный двигатель и редуктор</li><li>Плоскощелевая головка и сетки, каландр, охлаждение (чиллер)</li><li>Рольганг, толщиномер, обрезь кромки, намотчик, шкаф управления</li></ul></div>
+    <div class="card"><h3>Как играть</h3>
+      <ul><li>Запусти линию и следи за плитками узлов: <b>зелёный</b> — норма, <b>жёлтый</b> — внимание, <b>красный</b> — авария</li><li>Касанием открывай узел, смотри показания и ищи причину</li><li>Ремонт только после <b>блокировки LOTO</b>. Работа без неё — несчастный случай</li><li>Толщиномер тоже может врать: проверяй его микрометром</li></ul></div>
+    <div><p class="best" style="margin:0 0 8px">Сложность</p>
+      <div class="chips" id="diff"><button class="chip" data-d="easy">Спокойная · 3 события</button><button class="chip on" data-d="normal">Обычная · 5</button><button class="chip" data-d="hard">Тяжёлая · 7</button></div></div>
+    <button class="btn primary big" id="bGo">Начать смену</button>
+    <p class="best" id="best"></p>
+    <p class="best">Это учебная модель, а не точная копия конкретной линии. Реальные режимы и порядок работ определяют инструкции вашего предприятия и паспорта оборудования.</p>
+  </section>
+
+  <!-- ИГРА -->
+  <section class="screen" id="s-game">
+    <div class="gh"><div class="clock" id="clock">08:00<small id="clockS">до конца смены 8:00</small></div>
+      <div class="spd" id="spd"><button data-s="0" aria-label="Пауза">II</button><button data-s="1" class="on">×1</button><button data-s="2">×2</button><button data-s="4">×4</button></div></div>
+    <div class="banner" id="banner"><b id="bnT"></b><span id="bnS"></span></div>
+    <div class="job" id="jobBar" hidden><b id="jobT"></b><div class="prog"><i id="jobP"></i></div></div>
+    <div class="row"><button class="btn primary" id="bMain">Пуск</button><button class="btn lock" id="bLoto">Блокировка</button></div>
+    <div class="kpi"><div class="k"><span>OEE смены</span><b id="kOee">—</b></div><div class="k"><span>Годного листа, кг</span><b id="kGood">0<small id="kOrd">/ 3000</small></b><div class="prog"><i id="kBar"></i></div></div></div>
+    <nav class="tabs" id="tabs"><button data-t="line" class="on">Линия</button><button data-t="panel">Пульт</button><button data-t="thick">Толщина</button><button data-t="log">Журнал</button></nav>
+
+    <div class="tab on" id="t-line">
+      <div class="plant" id="plant"></div>
+      <div class="alarms" id="alarms"></div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+    <div class="tab" id="t-panel">
+      <div class="pred"><b id="predV">1,00 мм</b><span id="predS">Расчётная толщина при таких оборотах, скорости и вытяжке</span></div>
+      <div id="sliders" style="display:grid;gap:10px"></div>
+    </div>
+    <div class="tab" id="t-thick">
+      <div class="bigread"><b id="thV">—</b><span id="thS">мм по толщиномеру · норма 1,00 ±0,03</span></div>
+      <div class="chart"><svg id="prof" viewBox="0 0 336 150"></svg><p>Профиль по ширине листа. Касанием по столбику подтягивается болт головки.</p></div>
+      <div class="chart"><svg id="trend" viewBox="0 0 336 90"></svg><p>Тренд толщины за последние 90 минут</p></div>
+      <div class="row"><button class="btn ghost" id="bMic">Замерить микрометром</button><button class="btn ghost" id="bCal">Калибровать толщиномер</button></div>
+      <div class="tg"><span>Авто толщина<small>Корректирует обороты по толщиномеру</small></span><button class="sw" id="swTh" role="switch" aria-checked="false" aria-label="Авто толщина"></button></div>
+      <div class="tg"><span>Авто профиль<small>Подстраивает болты головки автоматически</small></span><button class="sw" id="swPr" role="switch" aria-checked="false" aria-label="Авто профиль"></button></div>
+    </div>
+    <div class="tab" id="t-log">
+      <div class="lg" id="lg"></div>
+      <button class="btn ghost" id="bEnd">Закончить смену досрочно</button>
+    </div>
+  </section>
+
+  <!-- ИТОГ -->
+  <section class="screen" id="s-end"><div id="endBody" style="display:contents"></div></section>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+
+const H0=1.0, ORDER_KG=3000, IDEAL=600, SHIFT=480, ROLL_LEN=300;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const lin=(x,a,b)=>x<=a?1:x>=b?0:1-(x-a)/(b-a);           // 1 до a, 0 после b
+function curveL(x,pts){ if(x<=pts[0][0])return pts[0][1]; for(let i=1;i<pts.length;i++){ if(x<=pts[i][0]){const a=pts[i-1],b=pts[i];return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]);}} return pts[pts.length-1][1]; }
+function mulberry(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+const FAULTS={
+ gear:{n:'Редуктор: потеря масла',r:0.012,comp:'gear'},
+ fan:{n:'Двигатель: забит обдув',r:0.015,comp:'motor'},
+ tc:{n:'Термопара зоны 3',r:0.25,comp:'screw'},
+ heater:{n:'ТЭН зоны 2',r:0.4,comp:'screw'},
+ bridge:{n:'Бункер: свод сырья',r:0.15,comp:'hopper'},
+ gauge:{n:'Толщиномер: дрейф',r:0.02,comp:'gauge'},
+ foul:{n:'Чиллер: грязный конденсатор',r:0.012,comp:'chill'},
+ bearing:{n:'Рольганг: подшипник ролика',r:0.012,comp:'roll'},
+ air:{n:'Намотчик: пневмовал',r:0.02,comp:'wind'},
+ filter:{n:'Шкаф: забит фильтр',r:0.012,comp:'elec'},
+ die:{n:'Головка: сбой профиля',r:1,comp:'die'}
+};
+const JOBS={
+ gear:{n:'Проверить и долить масло в редукторе',min:5,fix:'gear',comp:'gear'},
+ fan:{n:'Очистить обдув двигателя',min:4,fix:'fan',comp:'motor'},
+ tc:{n:'Заменить термопару зоны 3',min:4,fix:'tc',comp:'screw'},
+ heater:{n:'Заменить ТЭН зоны 2',min:8,fix:'heater',comp:'screw'},
+ bridge:{n:'Разбить свод и очистить горловину бункера',min:3,fix:'bridge',comp:'hopper'},
+ screen:{n:'Заменить пакет сеток',min:8,fix:null,comp:'die'},
+ foul:{n:'Промыть конденсатор чиллера',min:6,fix:'foul',comp:'chill'},
+ bearing:{n:'Заменить подшипник ролика',min:6,fix:'bearing',comp:'roll'},
+ air:{n:'Обслужить пневмовал намотчика',min:5,fix:'air',comp:'wind'},
+ filter:{n:'Заменить фильтр шкафа управления',min:4,fix:'filter',comp:'elec'},
+ thread:{n:'Заправить лист после обрыва',min:5,fix:null,comp:'calender'}
+};
+const COMPS=['hopper','screw','motor','gear','die','calender','chill','roll','gauge','wind','elec','trim'];
+const CNAME={hopper:'Бункер и дозатор',screw:'Шнек и цилиндр',motor:'Главный двигатель',gear:'Редуктор',die:'Головка и сетки',calender:'Каландр',chill:'Охлаждение',roll:'Рольганг',gauge:'Толщиномер',wind:'Намотчик',elec:'Электроника',trim:'Обрезь кромки'};
+
+function randn(rnd){let u=0,v=0;while(!u)u=rnd();v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+
+function makeSim(diff,seed){
+  const rnd=mulberry(seed||Math.floor(Math.random()*1e9));
+  const F={}; Object.keys(FAULTS).forEach(k=>F[k]={on:false,sev:0,tOn:null,tDet:null,tFix:null});
+  const pool=Object.keys(FAULTS);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
+  const n={easy:3,normal:5,hard:7}[diff]||5;
+  let times=[]; for(let i=0;i<n;i++)times.push(25+rnd()*410); times.sort((a,b)=>a-b);
+  for(let i=1;i<times.length;i++) if(times[i]-times[i-1]<22) times[i]=times[i-1]+22;
+  const sched=pool.slice(0,n).map((k,i)=>({k,t:Math.min(times[i],455),done:false,idx:1+Math.floor(rnd()*8)}));
+  const e=[]; for(let i=0;i<21;i++)e.push(randn(rnd)*0.012); const me=e.reduce((a,b)=>a+b)/21; for(let i=0;i<21;i++)e[i]-=me;
+  const s={
+    rnd,diff,sched,F,t:0,state:'stopped',reason:'',ramp:0,ended:false,
+    sp:{rpm:100,barrel:220,die:225,speed:9.9,chill:20,draw:100.5,tension:60,gap:1.0,autoTh:false,autoPr:false},
+    z:[195,210,220,225],rpm:0,v:0,tw:22,tg:52,tm:70,tcab:38,screen:0.05,bin:0.1,corr:0,derate:1,Ta:24,
+    e,bias:0,biasSign:1,gauge:1.0,prof:e.map(x=>1+x),scanT:0,hist:[],lastHist:-1,
+    rollerIdx:3,needThread:false,job:null,loto:0,incidentLeft:0,
+    roll:{len:0,qsum:0,n:1},rolls:[],
+    m:{H:null,Tm:225,P:0,L:0,mdot:0,Tout:22,Troll:52,spread:0,q:1,fac:{},feed:1,tenA:60,vib:[],scratch:0,qMelt:1},
+    st:{run:0,stop:0,trip:0,lock:0,incident:0,total:0,good:0,incidents:0,lossQ:{},trips:[],timeline:[],jobs:[]},
+    stat:{},log:[],newAlarm:false,qc:[120,240,360].map(t=>({t,done:false}))
+  };
+  COMPS.forEach(c=>s.stat[c]='ok');
+  addLog(s,'info','Смена началась. Линия прогрета и остановлена. Проверь пульт и запускай.');
+  return s;
+}
+function addLog(s,kind,text){s.log.unshift({t:s.t,kind,text});if(s.log.length>200)s.log.pop()}
+
+function canStart(s){
+  if(s.ended)return 'Смена окончена';
+  if(s.state==='running')return 'Линия уже работает';
+  if(s.state==='locked')return 'Линия заблокирована (LOTO). Сними блокировку';
+  if(s.state==='incident')return 'Идёт расследование инцидента';
+  if(s.job)return 'Выполняется работа';
+  if(s.needThread)return 'После обрыва нужно заправить лист';
+  const spz=[s.sp.barrel-25,s.sp.barrel-10,s.sp.barrel,s.sp.die];
+  for(let i=0;i<4;i++){ if(spz[i]-s.z[i]>10) return 'Холодный пуск запрещён: зона '+(i+1)+' ниже уставки на '+Math.round(spz[i]-s.z[i])+' °C. Дождись прогрева'; }
+  if(s.tg>92)return 'Редуктор слишком горячий ('+Math.round(s.tg)+' °C). Дай остыть и найди причину';
+  if(s.tm>125)return 'Двигатель слишком горячий ('+Math.round(s.tm)+' °C). Дай остыть и найди причину';
+  if(s.tcab>54)return 'Шкаф управления перегрет ('+Math.round(s.tcab)+' °C)';
+  if(s.bin>=0.98)return 'Бункер обрези переполнен. Опорожни его';
+  if(s.screen>0.62)return 'Сетки забиты: давление снова превысит предел. Замени пакет сеток';
+  return null;
+}
+function cmdStart(s){const r=canStart(s);if(r){addLog(s,'warn','Пуск отклонён: '+r);return r}s.state='running';s.reason='';addLog(s,'info','Пуск линии');return null}
+function cmdStop(s){if(s.state==='running'){s.state='stopped';addLog(s,'info','Линия остановлена оператором')}}
+function advance(s,min){let left=min;while(left>0&&!s.ended){const d=Math.min(0.25,left);step(s,d);left-=d}}
+const LOTO_STEPS=['Отключить питание привода и нагрева','Установить замок и бирку со своим именем','Сбросить остаточную энергию: давление, нагрев, инерцию','Проверить: пробный пуск не запускается'];
+function lotoNext(s){
+  if(s.state==='running'){return 'Сначала останови линию'}
+  if(s.state==='locked'||s.loto>=LOTO_STEPS.length)return null;
+  if(s.loto===0&&s.rpm>3)return 'Дождись остановки шнека: он ещё вращается';
+  advance(s,1); s.loto++;
+  if(s.loto>=LOTO_STEPS.length){s.state='locked';addLog(s,'info','Блокировка установлена. Можно работать на оборудовании')}
+  return null;
+}
+function cmdUnlock(s){
+  if(s.state!=='locked')return 'Блокировка не установлена';
+  if(s.job)return 'Дождись окончания работы';
+  advance(s,1); s.state='stopped'; s.loto=0; addLog(s,'info','Блокировка снята. Люди выведены из опасной зоны, оборудование готово к пуску');return null;
+}
+function startJob(s,id,unsafe){
+  if(s.ended||s.job)return 'busy';
+  if(s.state==='incident')return 'busy';
+  if(s.state!=='locked'){
+    if(!unsafe)return 'nolock';
+    s.state='incident';s.incidentLeft=45;s.job=null;s.loto=0;s.st.incidents++;
+    addLog(s,'alarm','ИНЦИДЕНТ: работа на оборудовании без блокировки. Расследование: линия стоит 45 мин');
+    return 'incident';
+  }
+  const j=JOBS[id];s.job={id,left:j.min,total:j.min};addLog(s,'info','Начата работа: '+j.n+' ('+j.min+' мин)');return null;
+}
+function finishJob(s){
+  const id=s.job.id,j=JOBS[id];s.job=null;
+  let found=false;
+  if(j.fix&&s.F[j.fix].on){const f=s.F[j.fix];f.on=false;f.sev=0;f.tFix=s.t;found=true;addLog(s,'ok','Причина устранена: '+FAULTS[j.fix].n)}
+  if(id==='screen'){s.screen=0.05;found=true;addLog(s,'ok','Пакет сеток заменён')}
+  if(id==='thread'){if(s.needThread){s.needThread=false;found=true;addLog(s,'ok','Лист заправлен')}}
+  s.st.jobs.push({id,t:s.t,found});
+  if(!found)addLog(s,'warn','Работа выполнена, но неисправность не найдена: время потеряно. Сначала диагностируй');
+}
+function tapBolt(s,i){const e=s.e;const old=e[i];e[i]*=0.25;if(i>0)e[i-1]*=0.75;if(i<20)e[i+1]*=0.75;const me=e.reduce((a,b)=>a+b)/21;for(let k=0;k<21;k++)e[k]-=me;return old}
+function micrometer(s){
+  const H=s.m.H; if(H===null){return null}
+  const val=H+randn(s.rnd)*0.004;
+  const diff=Math.abs(val-s.gauge);
+  const f=s.F.gauge; if(f.on&&f.tDet===null&&diff>0.015){f.tDet=s.t}
+  addLog(s,diff>0.015?'warn':'info','Микрометр: '+val.toFixed(3).replace('.',',')+' мм. Толщиномер показывает '+s.gauge.toFixed(3).replace('.',',')+' мм'+(diff>0.015?'. Расхождение! Проверь калибровку':'. Показания сходятся'));
+  return {val,diff};
+}
+function calibrate(s){
+  if(s.state!=='running'&&s.state!=='stopped')return;
+  s.bias=0;const f=s.F.gauge;if(f.on){f.on=false;f.sev=0;f.tFix=s.t;if(f.tDet===null)f.tDet=s.t;addLog(s,'ok','Толщиномер откалиброван: дрейф устранён')}else addLog(s,'info','Толщиномер откалиброван: отклонений не было');
+}
+function emptyBin(s){if(s.bin>0.05){s.bin=0.02;addLog(s,'ok','Бункер обрези опорожнён')}}
+
+function step(s,dt){
+  if(s.ended)return;
+  const sp=s.sp,F=s.F;
+  s.t+=dt;
+  const Ta=24+7*Math.sin(Math.PI*Math.min(s.t,SHIFT)/SHIFT);s.Ta=Ta;
+  for(const ev of s.sched){ if(!ev.done&&s.t>=ev.t){ ev.done=true;const f=F[ev.k];f.on=true;f.tOn=s.t;f.tDet=null;f.tFix=null;f.sev=ev.k==='die'?1:0.02;
+    if(ev.k==='die'){const i=Math.floor(s.rnd()*21);s.e[i]+=(s.rnd()<.5?-1:1)*0.09;const me=s.e.reduce((a,b)=>a+b)/21;for(let k=0;k<21;k++)s.e[k]-=me}
+    if(ev.k==='bearing')s.rollerIdx=ev.idx;
+    if(ev.k==='gauge')s.biasSign=s.rnd()<.5?-1:1;
+  }}
+  for(const qc of s.qc){ if(!qc.done&&s.t>=qc.t){qc.done=true; if(s.m.H!==null){const v=s.m.H+randn(s.rnd)*0.004;addLog(s,'info','ОТК замерил среднюю толщину листа: '+v.toFixed(3).replace('.',',')+' мм. Толщиномер показывает '+s.gauge.toFixed(3).replace('.',',')+' мм')}else addLog(s,'info','ОТК: линия стоит, замер невозможен')}}
+  for(const k in F){const f=F[k];if(f.on&&k!=='die'&&f.sev<1)f.sev=Math.min(1,f.sev+FAULTS[k].r*dt)}
+  if(F.die.on){const sp2=Math.max(...s.e)-Math.min(...s.e);if(sp2<=0.08){F.die.on=false;F.die.sev=0;F.die.tFix=s.t;if(F.die.tDet===null)F.die.tDet=s.t}}
+
+  const run=s.state==='running';
+  if(run)s.ramp=Math.min(1,s.ramp+dt/10);else s.ramp=Math.max(0,s.ramp-dt/(s.state==='tripped'?3:6));
+  if(!run)s.corr=0;
+  // шкаф
+  const Lp=s.m.L||0;
+  s.tcab+=((Ta+8+4*Lp+24*F.filter.sev)-s.tcab)*Math.min(1,0.08*dt);
+  s.derate=s.tcab>45?Math.max(0.5,1-(s.tcab-45)*0.05):1;
+  const rpmT=Math.min(sp.rpm*(1+s.corr),120*s.derate)*s.ramp, vT=Math.min(sp.speed,25*s.derate)*s.ramp;
+  s.rpm+=(rpmT-s.rpm)*Math.min(1,0.6*dt); s.v+=(vT-s.v)*Math.min(1,0.6*dt);
+  if(s.rpm<0.05)s.rpm=0; if(s.v<0.02)s.v=0;
+  // зоны
+  const locked=s.state==='locked';
+  const spz=[sp.barrel-25,sp.barrel-10,sp.barrel,sp.die];
+  for(let i=0;i<4;i++){
+    let tgt=locked?Ta:spz[i];
+    if(i===2&&F.tc.on&&!locked)tgt=spz[2]+70*Math.min(1,F.tc.sev*2);
+    if(i===1&&F.heater.on)tgt=locked?Ta:Ta+(spz[1]-Ta)*(1-F.heater.sev)*0.35;
+    const kc=tgt<s.z[i]?(locked?0.008:0.04):0.10;
+    let d=(tgt-s.z[i])*kc; if(d>3)d=3; s.z[i]+=d*dt;
+  }
+  // расплав, давление, производительность
+  const z=s.z, Tm=0.2*z[0]+0.25*z[1]+0.35*z[2]+0.2*z[3]+0.15*s.rpm;
+  const qMelt=curveL(Tm,[[190,0],[215,1],[245,1],[275,0]]);
+  const eff=clamp(0.75+(Tm-200)*0.01,0.75,1.0), feed=1-0.55*F.bridge.sev;
+  const visc=Math.exp(-0.02*(Tm-225));
+  const P=s.rpm>0.5?45+1.1*s.rpm*visc*(1+2.2*s.screen)*feed:0;
+  const back=1-0.0006*Math.max(0,P-150);
+  const mdot=5.4*s.rpm*eff*feed*back;
+  const L=s.rpm>0.5?Math.min(1.5,0.25+0.75*(s.rpm/120)*(P/200)):0;
+  if(s.rpm>0.5&&s.v>0.3&&run)s.screen=Math.min(1,s.screen+0.0012*1.3*dt);
+  // температуры узлов
+  s.tg+=((30+0.6*(s.tw-20)+45*L+28*F.gear.sev)-s.tg)*Math.min(1,0.05*dt);
+  s.tm+=((40+0.5*(Ta-24)+55*Math.pow(L,1.5)+45*F.fan.sev)-s.tm)*Math.min(1,0.06*dt);
+  const Tmin=12+0.6*(Ta-24)+0.0105*mdot+14*F.foul.sev;
+  s.tw+=(Math.max(sp.chill,Tmin)-s.tw)*Math.min(1,0.15*dt);
+  const Tout=s.tw+(Tm-s.tw)*Math.exp(-23.4/Math.max(s.v,0.5)), Troll=30+s.tw;
+  const tenA=sp.tension-28*F.air.sev, scratch=0.35*F.bearing.sev;
+  // толщина
+  const H=(s.v>0.3&&mdot>1)?(mdot/(54.6*s.v))*(100.5/sp.draw):null;
+  // профиль
+  const sig=0.0018*Math.sqrt(dt);
+  for(let i=0;i<21;i++)s.e[i]+=randn(s.rnd)*sig;
+  const dev=z[3]-225; if(Math.abs(dev)>12)for(let i=0;i<21;i++)s.e[i]+=(i-10)/10*0.0004*dev*dt;
+  if(sp.autoPr&&run&&s.ramp>0.8){const k=Math.exp(-dt/12);for(let i=0;i<21;i++)s.e[i]*=k}
+  const me=s.e.reduce((a,b)=>a+b)/21; for(let i=0;i<21;i++)s.e[i]-=me;
+  const spread=Math.max(...s.e)-Math.min(...s.e);
+  // толщиномер
+  if(F.gauge.on)s.bias=s.biasSign*0.06*F.gauge.sev;
+  s.scanT+=dt;
+  if(s.scanT>=0.5&&H!==null){s.scanT=0;s.gauge=H*(1+s.bias)+randn(s.rnd)*0.002;s.prof=s.e.map(x=>H*(1+x+s.bias)*(1+randn(s.rnd)*0.003))}
+  if(sp.autoTh&&run&&s.ramp>0.9&&H!==null){s.corr=clamp(s.corr+0.10*(H0-s.gauge)*dt,-0.15,0.15)}
+  if(Math.floor(s.t)>s.lastHist){s.lastHist=Math.floor(s.t);s.hist.push(H!==null?s.gauge:null);if(s.hist.length>90)s.hist.shift()}
+  // качество
+  let q=1,fac={};
+  if(H!==null){
+    const d=Math.abs(H-H0);
+    fac.th=lin(d,0.03,0.10);
+    fac.pr=lin(spread,0.08,0.20);
+    fac.mlt=Math.min(1,qMelt*1.15);
+    fac.cool=lin(Tout,60,85);
+    const dr=Troll<45?45-Troll:Troll>60?Troll-60:0; fac.roll=Math.max(0.3,1-0.04*dr);
+    const dd=sp.draw<99.5?99.5-sp.draw:sp.draw>101.5?sp.draw-101.5:0; fac.draw=Math.max(0.3,1-0.2*dd);
+    const dt2=tenA<45?45-tenA:tenA>75?tenA-75:0; fac.ten=Math.max(0.4,1-0.025*dt2);
+    fac.scr=1-scratch;
+    const dg=Math.abs(sp.gap-H); fac.gap=dg<=0.10?1:Math.max(0.5,1-1.2*(dg-0.10));
+    for(const k in fac)q*=fac[k];
+  }
+  s.m={H,Tm,P,L,mdot,Tout,Troll,spread,q,fac,feed,tenA,scratch,qMelt,eff};
+  // выпуск
+  if(H!==null){
+    const dm=mdot/60*dt; s.st.total+=dm; s.st.good+=dm*q;
+    const lq=-Math.log(Math.max(q,1e-6));
+    if(q<0.999&&lq>0){const loss=dm*(1-q);for(const k in fac){const sh=-Math.log(Math.max(fac[k],1e-6))/lq;s.st.lossQ[k]=(s.st.lossQ[k]||0)+loss*sh}}
+    s.bin=Math.min(1.2,s.bin+dm*0.06/120);
+    s.roll.len+=s.v*dt; s.roll.qsum+=q*s.v*dt;
+    if(s.roll.len>=ROLL_LEN){const avg=s.roll.qsum/s.roll.len;s.rolls.push({n:s.roll.n,q:avg,t:s.t});addLog(s,avg>=0.9?'ok':'warn','Рулон №'+s.roll.n+' готов: '+(avg>=0.9?'сорт A':avg>=0.6?'сорт B':'брак'));s.roll={len:s.roll.len-ROLL_LEN,qsum:0,n:s.roll.n+1}}
+  }
+  // вибрации
+  const vib=[];for(let i=1;i<=8;i++)vib.push(1.2+Math.abs(randn(s.rnd))*0.25+(F.bearing.on&&i===s.rollerIdx?6*F.bearing.sev:0));
+  s.m.vib=vib;
+  // отключения
+  if(run){
+    let why=null;
+    if(P>=280)why='Давление расплава выше предела (280 бар)';
+    else if(L>1.10)why='Перегрузка главного двигателя';
+    else if(s.tg>95)why='Перегрев масла редуктора';
+    else if(s.tm>130)why='Перегрев главного двигателя';
+    else if(s.tcab>58)why='Отказ приводов: перегрев шкафа управления';
+    else if(s.bin>=1)why='Переполнен бункер обрези';
+    else if(Math.max(...z)>290)why='Перегрев зоны цилиндра';
+    else if(H!==null&&s.ramp>0.9){
+      let pb=0.0003+0.03*Math.max(0,sp.draw-102)+0.02*Math.max(0,(tenA-85)/10)+(H<0.75?0.02:0);
+      if(F.bearing.sev>=1)pb=1;
+      if(s.rnd()<pb*dt){why='Обрыв листа';s.needThread=true}
+    }
+    if(why){s.state='tripped';s.reason=why;s.st.trips.push({t:s.t,why});addLog(s,'alarm','АВАРИЙНЫЙ ОСТАНОВ: '+why);s.newAlarm=true}
+  }
+  // статистика по состояниям
+  const stt=s.state; if(stt==='running')s.st.run+=dt;else if(stt==='stopped')s.st.stop+=dt;else if(stt==='tripped')s.st.trip+=dt;else if(stt==='locked')s.st.lock+=dt;else if(stt==='incident')s.st.incident+=dt;
+  const bucket=Math.floor(s.t/10); if(s.st.timeline[bucket]===undefined)s.st.timeline[bucket]={run:0,other:0,q:0,qn:0};
+  const b=s.st.timeline[bucket]; if(stt==='running'){b.run+=dt;if(H!==null){b.q+=q*dt;b.qn+=dt}}else b.other+=dt;
+  // работа и расследование
+  if(s.job&&s.state==='locked'){s.job.left-=dt;if(s.job.left<=0.0001)finishJob(s)}
+  if(s.state==='incident'){s.incidentLeft-=dt;if(s.incidentLeft<=0){s.state='stopped';addLog(s,'info','Расследование окончено. Линия остановлена, блокировка не установлена')}}
+  // статусы узлов
+  const ns=statuses(s);
+  for(const c of COMPS){
+    const o=s.stat[c],n=ns[c].st;
+    if(n!==o){
+      if(n!=='ok'&&(o==='ok'||(o==='warn'&&n==='alarm'))){addLog(s,n==='alarm'?'alarm':'warn',CNAME[c]+': '+ns[c].msg);s.newAlarm=true}
+      s.stat[c]=n;
+    }
+    if(n!=='ok'){for(const k in FAULTS){if(FAULTS[k].comp===c&&F[k].on&&F[k].tDet===null&&k!=='gauge')F[k].tDet=s.t}}
+  }
+  if(s.t>=SHIFT){s.ended=true;s.state=s.state==='running'?'stopped':s.state;addLog(s,'info','Смена окончена')}
+}
+
+function statuses(s){
+  const m=s.m,F=s.F,z=s.z,sp=s.sp,out={};
+  const put=(c,st,msg)=>{ if(!out[c]||(st==='alarm')||(st==='warn'&&out[c].st==='ok'))out[c]={st,msg} };
+  COMPS.forEach(c=>out[c]={st:'ok',msg:''});
+  const feed=m.feed;
+  if(feed<0.6)put('hopper','alarm','сырьё почти не поступает');else if(feed<0.85)put('hopper','warn','сырьё поступает хуже, выпуск падает');
+  const spz=[sp.barrel-25,sp.barrel-10,sp.barrel,sp.die];
+  if(F.tc.on&&s.state!=='locked')put('screw','alarm','зона 3: нет сигнала термопары');
+  for(let i=0;i<4;i++){const d=Math.abs(z[i]-spz[i]); if(s.state==='locked')continue; if(d>25)put('screw','alarm','зона '+(i+1)+': температура уходит от уставки'); else if(d>12)put('screw','warn','зона '+(i+1)+': температура не держится');}
+  if(s.rpm>5&&(m.Tm<212||m.Tm>248))put('screw','warn','температура расплава вне рабочего окна');
+  if(Math.max(...z)>270)put('screw','alarm','перегрев цилиндра');
+  if(m.L>1.05||s.tm>125)put('motor','alarm','двигатель перегружен или перегрет');else if(m.L>0.95||s.tm>110)put('motor','warn',m.L>0.95?'нагрузка близка к пределу':'температура выше нормы');
+  if(s.tg>92)put('gear','alarm','температура масла критична');else if(s.tg>82)put('gear','warn','температура масла выше нормы');
+  if(m.P>270)put('die','alarm','давление расплава у предела');else if(m.P>240)put('die','warn','давление расплава растёт');
+  if(m.H!==null){ if(m.spread>0.15)put('die','alarm','профиль толщины сильно вне допуска');else if(m.spread>0.08)put('die','warn','профиль толщины вне допуска') }
+  if(s.derate<1)put('calender','warn','привод ограничивает скорость линии');
+  if(m.H!==null&&(m.Troll<45||m.Troll>60))put('calender','warn','температура валков вне окна');
+  if(s.tw>34||m.Tout>75)put('chill','alarm','охлаждение не справляется');else if(s.tw>28||m.Tout>60)put('chill','warn',s.tw>28?'вода тёплая':'лист выходит горячим');
+  const vmax=Math.max(...m.vib);
+  if(vmax>7)put('roll','alarm','сильная вибрация ролика');else if(vmax>4)put('roll','warn','повышенная вибрация ролика');
+  if(m.H!==null&&(sp.draw<99.5||sp.draw>101.5))put('roll','warn','вытяжка вне окна');
+  if(m.H!==null){const dg=Math.abs(s.gauge-H0); if(dg>0.08)put('gauge','alarm','толщина сильно отличается от нормы');else if(dg>0.04)put('gauge','warn','толщина отличается от нормы')}
+  if(sp.autoTh&&Math.abs(s.corr)>0.03&&s.state==='running')put('gauge','warn','автомат сильно корректирует обороты');
+  if(m.H!==null){ if(m.tenA<32||m.tenA>90)put('wind','alarm','натяжение критично');else if(m.tenA<45||m.tenA>75)put('wind','warn','натяжение вне окна') }
+  if(s.tcab>54)put('elec','alarm','шкаф перегрет, приводы на грани отказа');else if(s.tcab>45)put('elec','warn','шкаф перегрет, скорость ограничена');
+  if(s.bin>0.95)put('trim','alarm','бункер обрези почти полон');else if(s.bin>0.8)put('trim','warn','бункер обрези заполняется');
+  return out;
+}
+function oee(s){
+  const A=s.t>0?s.st.run/s.t:0, P=s.st.run>0?Math.min(1.2,s.st.total/(IDEAL*s.st.run/60)):0, Q=s.st.total>0?s.st.good/s.st.total:0;
+  return {A,P,Q,oee:A*P*Q};
+}
+
+
+/* ================= UI ================= */
+const $=s=>document.querySelector(s), $$=s=>Array.prototype.slice.call(document.querySelectorAll(s));
+const RM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fm=(x,d=0)=>Number(x).toFixed(d).replace('.',',');
+const hhmm=t=>{const m=Math.floor(480+t);return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const hm=min=>{const m=Math.max(0,Math.round(min));return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* фон */
+const bg=(function(){
+  const cv=$('#bg'),cx=cv.getContext('2d');let W=1,H=1,T=RM?5:0,spd=1,tgt=1,glow=0,alertA=0,last=performance.now();
+  const B=[[.20,.15,0,1.3,.95,[40,60,200],.62],[.27,.21,2.1,4,.70,[200,40,140],.30],[.15,.26,4.2,.7,.85,[0,150,225],.28],[.12,.19,1.3,2.6,1.0,[20,30,120],.55],[.33,.14,5.3,3.3,.60,[150,70,255],.24]];
+  function fit(){const s=.3;W=cv.width=Math.max(2,Math.ceil(innerWidth*s));H=cv.height=Math.max(2,Math.ceil(innerHeight*s));draw()}
+  function draw(){
+    cx.globalCompositeOperation='source-over';cx.fillStyle='#06070c';cx.fillRect(0,0,W,H);cx.globalCompositeOperation='lighter';
+    const R=Math.max(W,H);
+    for(let i=0;i<B.length;i++){const b=B[i],x=W*(.5+.5*Math.sin(T*b[0]+b[2])),y=H*(.5+.5*Math.cos(T*b[1]+b[3])),r=R*b[4],a=Math.min(.9,b[6]+glow*.18),c=b[5];
+      const g=cx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,'rgba('+c[0]+','+c[1]+','+c[2]+','+a.toFixed(3)+')');g.addColorStop(1,'rgba('+c[0]+','+c[1]+','+c[2]+',0)');cx.fillStyle=g;cx.fillRect(0,0,W,H)}
+    if(alertA>0.01){const g=cx.createRadialGradient(W*.5,H*.35,0,W*.5,H*.35,R*.9);g.addColorStop(0,'rgba(255,50,80,'+alertA.toFixed(3)+')');g.addColorStop(1,'rgba(255,50,80,0)');cx.fillStyle=g;cx.fillRect(0,0,W,H)}
+  }
+  function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;spd+=(tgt-spd)*Math.min(1,dt*1.4);T+=dt*spd;glow*=Math.exp(-dt*2);alertA*=Math.exp(-dt*1.3);draw();requestAnimationFrame(frame)}
+  addEventListener('resize',fit);fit();if(!RM)requestAnimationFrame(frame);
+  return {pulse(){glow=1},alert(){alertA=.45},speed(v){tgt=v}};
+})();
+
+let sim=null,speed=1,tab='line',sheetOpen=false,diff='normal',actx=null,pendingJob=null,ended=false,last=performance.now(),accUI=0,logKey='';
+const DN={ok:'НОРМА',warn:'ВНИМАНИЕ',alarm:'АВАРИЯ'};
+
+function screen(id){$$('.screen').forEach(e=>e.classList.toggle('on',e.id==='s-'+id));window.scrollTo(0,0)}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2600)}
+function vib(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+function beep(hi){try{if(!actx)return;const t0=actx.currentTime;[hi?880:660,hi?660:520].forEach((f,k)=>{const o=actx.createOscillator(),g=actx.createGain(),t=t0+k*.18;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.12,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.16);o.connect(g);g.connect(actx.destination);o.start(t);o.stop(t+.2)})}catch(e){}}
+
+/* ---------- старт ---------- */
+const bestOee=store.get('smena:best');
+$('#best').textContent=bestOee?('Лучший результат: OEE '+Math.round(bestOee*100)+'%'):'';
+$$('#diff .chip').forEach(b=>b.addEventListener('click',()=>{diff=b.dataset.d;$$('#diff .chip').forEach(x=>x.classList.toggle('on',x===b))}));
+$('#bGo').addEventListener('click',newShift);
+
+/* ---------- сборка интерфейса игры ---------- */
+const SLIDERS=[
+ {k:'rpm',t:'Обороты шнека',u:'об/мин',min:20,max:120,step:1,dec:0,act:s=>'факт '+fm(s.rpm)+' об/мин',note:'Под 1,00 мм: около 100 об/мин при 9,9 м/мин'},
+ {k:'barrel',t:'Температура цилиндра (зона 3)',u:'°C',min:180,max:260,step:1,dec:0,act:s=>'факт '+fm(s.z[2])+' °C',note:'Расплав 215–245 °C. Зоны 1 и 2 идут ниже автоматически'},
+ {k:'die',t:'Температура головки',u:'°C',min:190,max:260,step:1,dec:0,act:s=>'факт '+fm(s.z[3])+' °C',note:'Ровный профиль около 225 °C'},
+ {k:'speed',t:'Скорость линии',u:'м/мин',min:2,max:20,step:0.1,dec:1,act:s=>'факт '+fm(s.v,1)+' м/мин',note:'Выше 14 м/мин лист не успевает остыть'},
+ {k:'chill',t:'Вода чиллера, уставка',u:'°C',min:10,max:40,step:1,dec:0,act:s=>'вода '+fm(s.tw,1)+' °C',note:'Валки: вода + 30 °C, окно 45–60. Ниже возможного чиллер не опустит'},
+ {k:'draw',t:'Вытяжка рольганга',u:'%',min:97,max:104,step:0.1,dec:1,act:s=>'лист '+(s.m.H===null?'—':fm(s.m.H,3)+' мм'),note:'Окно 99,5–101,5. Больше 102 растёт риск обрыва'},
+ {k:'tension',t:'Натяжение намотки',u:'%',min:20,max:100,step:1,dec:0,act:s=>'факт '+fm(s.m.tenA)+'%',note:'Окно 45–75. Слабое — рыхлый рулон, сильное — обрыв'},
+ {k:'gap',t:'Зазор каландра',u:'мм',min:0.6,max:1.6,step:0.01,dec:2,act:s=>'лист '+(s.m.H===null?'—':fm(s.m.H,2)+' мм'),note:'Зазор должен быть близок к толщине листа'}
+];
+let slRefs=[],tileRefs={},plantRefs={},profRefs=[];
+
+function buildSliders(){
+  $('#sliders').innerHTML=SLIDERS.map((d,i)=>'<div class="sl"><div class="h"><span>'+d.t+'</span><b><span data-v="'+i+'"></span><small>'+d.u+'</small></b></div><input type="range" min="'+d.min+'" max="'+d.max+'" step="'+d.step+'" value="'+sim.sp[d.k]+'" data-i="'+i+'" aria-label="'+d.t+'"><div class="f"><span data-a="'+i+'"></span><em>'+d.note+'</em></div></div>').join('');
+  slRefs=SLIDERS.map((d,i)=>({v:$('[data-v="'+i+'"]'),a:$('[data-a="'+i+'"]'),inp:$('input[data-i="'+i+'"]')}));
+  slRefs.forEach((r,i)=>r.inp.addEventListener('input',()=>{sim.sp[SLIDERS[i].k]=+r.inp.value;uiPanel()}));
+}
+function buildTiles(){
+  $('#tiles').innerHTML=COMPS.map(c=>'<button class="tile" data-c="'+c+'"><span class="tn">'+CNAME[c]+'</span><span class="tv">—</span><span class="ts"></span></button>').join('');
+  tileRefs={};$$('.tile').forEach(t=>{const c=t.dataset.c;tileRefs[c]={el:t,v:t.querySelector('.tv'),s:t.querySelector('.ts')};t.addEventListener('click',()=>openTile(c))});
+}
+function buildPlant(){
+  const tk=(id,cx,cy,r)=>'<line id="'+id+'" x1="'+cx+'" y1="'+cy+'" x2="'+(cx+r*.75)+'" y2="'+cy+'" stroke="#dbe6ff" stroke-width="1.4" stroke-linecap="round" pointer-events="none"/>';
+  let rl='',rlt='';for(let i=0;i<6;i++){const x=222+i*14;rl+='<circle class="blk" cx="'+x+'" cy="124" r="5"/>';rlt+=tk('rt'+i,x,124,5)}
+  $('#plant').innerHTML='<svg viewBox="0 0 360 150" role="img" aria-label="Схема линии">'+
+   '<path class="pipe" d="M196 24 H172 V49"/><path class="pipe" d="M248 21 H274 V140 H224 V130"/>'+
+   '<path id="pSheet" class="sheetline" d="M148 78 L172 75 C188 75 190 96 194 110 Q196 118 204 118 L338 118"/>'+
+   '<g data-c="motor"><rect class="blk" x="4" y="64" width="26" height="32" rx="4"/><text class="lbl" x="17" y="83">Двиг.</text></g>'+
+   '<g data-c="gear"><rect class="blk" x="32" y="66" width="22" height="28" rx="4"/><text class="lbl" x="43" y="83">Ред.</text></g>'+
+   '<g data-c="screw"><rect class="blk" x="56" y="70" width="76" height="20" rx="4"/><path d="M72 70v20M92 70v20M112 70v20" stroke="rgba(255,255,255,.22)"/><text class="lbl" x="94" y="102">Шнек, цилиндр</text></g>'+
+   '<g data-c="hopper"><path class="blk" d="M70 34 H104 L96 70 H78 Z"/><text class="lbl" x="87" y="29">Бункер</text></g>'+
+   '<g data-c="die"><rect class="blk" x="134" y="58" width="14" height="44" rx="3"/><text class="lbl" x="141" y="114">Голов.</text></g>'+
+   '<g data-c="calender"><circle class="blk" cx="172" cy="62" r="13"/><circle class="blk" cx="172" cy="88" r="13"/><circle class="blk" cx="200" cy="106" r="11"/>'+tk('rc0',172,62,13)+tk('rc1',172,88,13)+tk('rc2',200,106,11)+'<text class="lbl" x="150" y="46">Каландр</text></g>'+
+   '<g data-c="roll">'+rl+rlt+'<text class="lbl" x="257" y="146">Рольганг</text></g>'+
+   '<g data-c="gauge"><path class="blk" d="M300 100 h18 v8 h-18 z M300 128 h18 v8 h-18 z M316 108 v20"/><text class="lbl" x="309" y="96">Толщ.</text></g>'+
+   '<g data-c="wind"><circle id="wRoll" class="blk" cx="338" cy="104" r="14"/><text class="lbl" x="338" y="140">Намотка</text></g>'+
+   '<g data-c="chill"><rect class="blk" x="196" y="8" width="52" height="26" rx="5"/><text class="lbl" x="222" y="24">Чиллер</text></g>'+
+   '<g data-c="elec"><rect class="blk" x="258" y="8" width="44" height="26" rx="5"/><text class="lbl" x="280" y="24">Шкаф</text></g>'+
+   '<g data-c="trim"><rect class="blk" x="308" y="10" width="46" height="22" rx="5"/><text class="lbl" x="331" y="24">Обрезь</text></g>'+
+   '</svg>';
+  plantRefs={groups:$$('#plant g[data-c]'),sheet:$('#pSheet'),wRoll:$('#wRoll'),ticks:[['rc0',172,62],['rc1',172,88],['rc2',200,106]].concat([0,1,2,3,4,5].map(i=>['rt'+i,222+i*14,124])).map(a=>({el:document.getElementById(a[0]),cx:a[1],cy:a[2]})),ang:0,off:0};
+  $('#plant').addEventListener('click',e=>{const g=e.target.closest('g[data-c]');if(g)openTile(g.dataset.c)});
+}
+function buildProfile(){
+  let h='<rect x="0" y="55" width="336" height="40" fill="rgba(46,230,166,.09)"/><line x1="0" x2="336" y1="35" y2="35" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 4"/><line x1="0" x2="336" y1="115" y2="115" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 4"/><line x1="0" x2="336" y1="75" y2="75" stroke="rgba(255,255,255,.35)"/><text x="4" y="31" font-size="8" fill="rgba(226,232,255,.5)" font-family="Inter,Arial">+8%</text><text x="4" y="126" font-size="8" fill="rgba(226,232,255,.5)" font-family="Inter,Arial">−8%</text>';
+  for(let i=0;i<21;i++)h+='<g class="bar" data-i="'+i+'"><rect data-v x="'+(10+i*15.5)+'" y="75" width="12" height="0" rx="2" fill="#2ee6a6"/><rect x="'+(8+i*15.5)+'" y="0" width="16" height="150" fill="transparent"/></g>';
+  $('#prof').innerHTML=h;
+  profRefs=$$('#prof .bar').map(g=>g.querySelector('[data-v]'));
+  $('#prof').addEventListener('click',e=>{const g=e.target.closest('.bar');if(g&&sim&&!sim.ended){tapBolt(sim,+g.dataset.i);uiThick();bg.pulse()}});
+}
+
+/* ---------- запуск смены ---------- */
+function newShift(){
+  try{const AC=window.AudioContext||window.webkitAudioContext;actx=actx||new AC();actx.resume&&actx.resume()}catch(e){}
+  sim=makeSim(diff);speed=1;ended=false;pendingJob=null;logKey='';
+  buildSliders();buildTiles();buildPlant();buildProfile();
+  ['swTh','swPr'].forEach(id=>{$('#'+id).classList.remove('on');$('#'+id).setAttribute('aria-checked','false')});
+  setTab('line');spdBtn();screen('game');ui();
+}
+function spdBtn(){$$('#spd button').forEach(b=>b.classList.toggle('on',+b.dataset.s===speed))}
+$$('#spd button').forEach(b=>b.addEventListener('click',()=>{speed=+b.dataset.s;spdBtn()}));
+function setTab(t){tab=t;$$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));$$('.tab').forEach(e=>e.classList.toggle('on',e.id==='t-'+t));ui()}
+$$('#tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.t)));
+
+/* ---------- обновление ---------- */
+function measZ(s){const sp=s.sp,spz=[sp.barrel-25,sp.barrel-10,sp.barrel,sp.die],lk=s.state==='locked';
+  return s.z.map((z,i)=>{let meas=z,dem=lk?0:clamp(35+(spz[i]-z)*6,0,100);if(i===2&&s.F.tc.on&&!lk){meas=0;dem=100}return {i,z,meas,sp:spz[i],dem,cur:(i===1&&s.F.heater.on)?0:dem*0.18}})}
+const TV={
+ hopper:s=>[fm(s.m.feed*100)+'%','подача сырья'],
+ screw:s=>{const m=measZ(s);return [fm(s.m.Tm)+' °C','расплав · Z3 '+(m[2].meas<1?'нет сигн.':fm(m[2].meas))]},
+ motor:s=>[fm(s.m.L*100)+'%','обмотка '+fm(s.tm)+' °C'],
+ gear:s=>[fm(s.tg)+' °C','температура масла'],
+ die:s=>[fm(s.m.P)+' бар','сетки '+fm(s.screen/0.62*100)+'% · профиль '+fm(s.m.spread*100,1)+'%'],
+ calender:s=>[fm(s.v,1)+' м/мин','валки '+fm(s.m.Troll)+' °C'],
+ chill:s=>[fm(s.tw,1)+' °C','лист на выходе '+fm(s.m.Tout)+' °C'],
+ roll:s=>[fm(Math.max(...s.m.vib),1)+' мм/с','макс. вибрация'],
+ gauge:s=>[fm(s.gauge,3),'мм по толщиномеру'],
+ wind:s=>[fm(s.roll.len)+' м','рулон №'+s.roll.n+' из '+ROLL_LEN],
+ elec:s=>[fm(s.tcab)+' °C','шкаф · привод '+fm(s.derate*100)+'%'],
+ trim:s=>[fm(Math.min(1,s.bin)*100)+'%','бункер обрези']
+};
+function ui(){
+  if(!sim)return;
+  const s=sim,o=oee(s);
+  $('#clock').firstChild.nodeValue=hhmm(s.t);$('#clockS').textContent='до конца смены '+hm(SHIFT-s.t);
+  const b=$('#banner');b.className='banner '+({running:'run',tripped:'trip',incident:'inc',locked:'lck'}[s.state]||'');
+  const tx={running:['РАБОТА','Скорость '+fm(s.v,1)+' м/мин · '+fm(s.rpm)+' об/мин'],stopped:['ОСТАНОВЛЕНА','Нагрев включён. Проверь пульт и запускай'],tripped:['АВАРИЙНЫЙ ОСТАНОВ',s.reason+'. Найди причину до пуска'],locked:['БЛОКИРОВКА LOTO','Питание отключено, замок и бирка на месте. Можно работать'],incident:['ИНЦИДЕНТ','Расследование: осталось '+Math.ceil(s.incidentLeft)+' мин']}[s.state]||['',''];
+  $('#bnT').textContent=tx[0];$('#bnS').textContent=tx[1];
+  const bm=$('#bMain');
+  if(s.state==='running'){bm.textContent='Стоп';bm.className='btn danger';bm.disabled=false}
+  else{bm.textContent='Пуск';bm.className='btn primary';bm.disabled=(s.state==='locked'||s.state==='incident'||s.ended)}
+  const bl=$('#bLoto');
+  if(s.state==='locked'){bl.textContent='Снять блокировку';bl.disabled=!!s.job}else{bl.textContent='Блокировка LOTO';bl.disabled=(s.state==='incident'||s.ended)}
+  $('#jobBar').hidden=!s.job;
+  if(s.job){$('#jobT').textContent=JOBS[s.job.id].n+' · ещё '+Math.ceil(s.job.left)+' мин';$('#jobP').style.width=(100-s.job.left/s.job.total*100)+'%'}
+  $('#kOee').textContent=s.st.run>0?Math.round(o.oee*100)+'%':'—';
+  $('#kGood').firstChild.nodeValue=Math.round(s.st.good).toLocaleString('ru-RU');$('#kOrd').textContent=' / '+ORDER_KG.toLocaleString('ru-RU');
+  $('#kBar').style.width=Math.min(100,s.st.good/ORDER_KG*100)+'%';
+  if(tab==='line')uiLine();else if(tab==='panel')uiPanel();else if(tab==='thick')uiThick();else uiLog();
+}
+function uiLine(){
+  const s=sim,st=statuses(s);
+  COMPS.forEach(c=>{const r=tileRefs[c],v=TV[c](s);r.v.textContent=v[0];r.s.textContent=v[1];r.el.className='tile '+(st[c].st==='ok'?'':st[c].st)});
+  plantRefs.groups.forEach(g=>g.setAttribute('class','st-'+st[g.dataset.c].st));
+  const rr=9+7*Math.min(1,s.roll.len/ROLL_LEN);plantRefs.wRoll.setAttribute('r',rr.toFixed(1));plantRefs.wRoll.setAttribute('cy',(118-rr).toFixed(1));
+  const bad=COMPS.filter(c=>st[c].st!=='ok').sort((a,b)=>(st[a].st==='alarm'?0:1)-(st[b].st==='alarm'?0:1));
+  const box=$('#alarms'),key=bad.map(c=>c+st[c].st).join();
+  if(box.dataset.k!==key){box.dataset.k=key;box.innerHTML=bad.length?bad.map(c=>'<button class="al '+st[c].st+'" data-c="'+c+'"><i></i><span><b>'+CNAME[c]+'.</b> '+cap(st[c].msg)+'</span></button>').join(''):'<p class="calm">Все узлы в норме</p>';
+    $$('#alarms .al').forEach(a=>a.addEventListener('click',()=>openTile(a.dataset.c)))}
+}
+function uiPanel(){
+  if(!sim)return;const s=sim;
+  SLIDERS.forEach((d,i)=>{const r=slRefs[i];r.v.textContent=fm(s.sp[d.k],d.dec);r.a.textContent=d.act(s)});
+  const Hp=5.4*s.sp.rpm/(54.6*s.sp.speed)*(100.5/s.sp.draw);
+  $('#predV').textContent=fm(Hp,2)+' мм';$('#predV').style.color=Math.abs(Hp-1)<=0.03?'#2ee6a6':Math.abs(Hp-1)<=0.06?'#ffb020':'#ff8b97';
+}
+function uiThick(){
+  if(!sim)return;const s=sim;
+  $('#thV').textContent=s.m.H===null&&s.hist.every(x=>x===null)?'—':fm(s.gauge,3);
+  const mean=s.prof.reduce((a,b)=>a+b)/21;
+  profRefs.forEach((r,i)=>{const dev=(s.prof[i]/mean-1)*100,h=clamp(dev*5,-66,66);r.setAttribute('y',h>=0?75-h:75);r.setAttribute('height',Math.abs(h));const a=Math.abs(dev);r.setAttribute('fill',a<=4?'#2ee6a6':a<=8?'#ffb020':'#ff4d5e')});
+  const hist=s.hist.slice(-90),n=hist.length;let pts='',seg=[];
+  const X=i=>6+(324)*(i/Math.max(89,n-1)),Y=v=>80-(clamp(v,0.9,1.1)-0.9)/0.2*70;
+  let path='';hist.forEach((v,i)=>{if(v===null){seg=[];return}path+=(seg.length?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)+' ';seg.push(1)});
+  $('#trend').innerHTML='<rect x="0" y="'+Y(1.03)+'" width="336" height="'+(Y(0.97)-Y(1.03))+'" fill="rgba(46,230,166,.1)"/><line x1="0" x2="336" y1="'+Y(1)+'" y2="'+Y(1)+'" stroke="rgba(255,255,255,.3)" stroke-dasharray="3 4"/><path d="'+path+'" fill="none" stroke="#39c6ff" stroke-width="2" stroke-linejoin="round"/>';
+  $('#bMic').disabled=s.m.H===null;
+}
+function uiLog(){
+  const s=sim,key=s.log.length+':'+(s.log[0]?s.log[0].t:0)+':'+(s.log[0]?s.log[0].text:'');
+  if(key===logKey)return;logKey=key;
+  $('#lg').innerHTML=s.log.slice(0,80).map(l=>'<div class="li '+l.kind+'"><time>'+hhmm(l.t)+'</time><i></i><span>'+esc(l.text)+'</span></div>').join('');
+}
+function onAlarm(){
+  const l=sim.log.find(x=>x.kind==='alarm'||x.kind==='warn');
+  if(l)toast(l.text.length>70?l.text.slice(0,68)+'…':l.text);
+  const hard=sim.state==='tripped'||(l&&l.kind==='alarm');
+  vib(hard?[120,60,120]:60);beep(hard);bg.alert();
+  if(speed>1){speed=1;spdBtn()}
+}
+
+/* ---------- главный цикл ---------- */
+function frame(now){
+  const dtr=Math.min(0.1,(now-last)/1000);last=now;
+  if(sim&&$('#s-game').classList.contains('on')&&!sim.ended&&!sheetOpen&&speed>0){
+    advance(sim,dtr*2*speed);
+    if(sim.newAlarm){sim.newAlarm=false;onAlarm()}
+    const p=plantRefs;
+    if(p&&p.ticks){p.ang=(p.ang+sim.v*dtr*22)%360;p.off=(p.off-sim.v*dtr*7)%1000;p.ticks.forEach(t=>t.el&&t.el.setAttribute('transform','rotate('+p.ang.toFixed(0)+' '+t.cx+' '+t.cy+')'));if(sim.v>0.2)p.sheet.style.strokeDashoffset=p.off.toFixed(1)}
+  }
+  accUI+=dtr;if(accUI>0.25){accUI=0;ui()}
+  if(sim&&sim.ended&&!ended){ended=true;endShift()}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- кнопки управления ---------- */
+$('#bMain').addEventListener('click',()=>{
+  if(sim.state==='running'){cmdStop(sim)}
+  else{const r=cmdStart(sim);if(r){toast(r);vib(50);bg.alert()}}
+  ui();
+});
+$('#bLoto').addEventListener('click',()=>{
+  if(sim.state==='locked'){const r=cmdUnlock(sim);if(r)toast(r);ui();return}
+  openLoto(null);
+});
+$('#swTh').addEventListener('click',function(){sim.sp.autoTh=!sim.sp.autoTh;this.classList.toggle('on',sim.sp.autoTh);this.setAttribute('aria-checked',sim.sp.autoTh)});
+$('#swPr').addEventListener('click',function(){sim.sp.autoPr=!sim.sp.autoPr;this.classList.toggle('on',sim.sp.autoPr);this.setAttribute('aria-checked',sim.sp.autoPr)});
+$('#bMic').addEventListener('click',()=>{const r=micrometer(sim);if(r){toast('Микрометр: '+fm(r.val,3)+' мм · толщиномер: '+fm(sim.gauge,3)+' мм')}else toast('Линия не выпускает лист: замерять нечего')});
+$('#bCal').addEventListener('click',()=>{calibrate(sim);toast('Толщиномер откалиброван');uiThick()});
+$('#bEnd').addEventListener('click',()=>{if(window.confirm('Закончить смену досрочно?')){sim.ended=true;sim.state=sim.state==='running'?'stopped':sim.state}});
+
+/* ---------- окна ---------- */
+function openSheet(html){$('#sheetBody').innerHTML=html;$('#sheet').classList.add('on');$('#back').classList.add('on');sheetOpen=true;$('#sheet').scrollTop=0}
+function closeSheet(){$('#sheet').classList.remove('on');$('#back').classList.remove('on');sheetOpen=false;pendingJob=null;ui()}
+$('#back').addEventListener('click',closeSheet);
+$('#sheetBody').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,id=b.dataset.id;
+  if(a==='close')closeSheet();
+  else if(a==='job')doJob(id);
+  else if(a==='loto')openLoto(id||null);
+  else if(a==='lotostep')lotoStep();
+  else if(a==='unsafe')unsafeJob(id);
+  else if(a==='mic'){const r=micrometer(sim);toast(r?'Микрометр: '+fm(r.val,3)+' мм · толщиномер: '+fm(sim.gauge,3)+' мм':'Линия не выпускает лист');openTile('gauge')}
+  else if(a==='cal'){calibrate(sim);toast('Толщиномер откалиброван');openTile('gauge')}
+  else if(a==='bin'){emptyBin(sim);toast('Бункер обрези опорожнён');openTile('trim')}
+  else if(a==='thick'){closeSheet();setTab('thick')}
+  else if(a==='tile')openTile(id);
+});
+function doJob(id){
+  const r=startJob(sim,id,false);
+  if(r==='nolock')openWarn(id);
+  else if(r==='busy'){toast('Сейчас нельзя: идёт другая работа или расследование')}
+  else closeSheet();
+}
+function openWarn(id){
+  openSheet('<h2>Нужна блокировка</h2><div class="bad"><b>Без блокировки работать нельзя</b>'+esc(JOBS[id].n)+': оборудование может неожиданно запуститься или в нём остаётся энергия. Сначала останови линию и заблокируй её по процедуре LOTO.</div><div class="acts"><button class="btn lock" data-act="loto" data-id="'+id+'">Заблокировать по процедуре</button><button class="btn danger" data-act="unsafe" data-id="'+id+'">Всё равно выполнить</button><button class="btn link" data-act="close">Отмена</button></div>');
+}
+function unsafeJob(id){
+  const r=startJob(sim,id,true);
+  if(r==='incident'){vib([300,100,300]);bg.alert();
+    openSheet('<h2>Несчастный случай</h2><div class="bad"><b>Работа без блокировки</b>Пока ты работал, линию запустили или высвободилась остаточная энергия. Пострадал человек. Линия стоит 45 минут: идёт расследование.</div><div class="rows"><div class="rw"><span>Как правильно</span><b></b></div></div><ol style="margin:0 0 14px;padding-left:20px;color:var(--mute);font-size:14.5px;font-weight:600;display:grid;gap:4px"><li>Остановить линию</li><li>Отключить питание</li><li>Установить свой замок и бирку</li><li>Снять остаточную энергию</li><li>Проверить, что пуск невозможен</li></ol><button class="btn primary big" data-act="close">Понятно</button>');
+  }else closeSheet();
+}
+function openLoto(job){
+  pendingJob=job;renderLoto();
+}
+function renderLoto(){
+  const s=sim;
+  const steps=[{t:'Остановить линию',done:s.state!=='running'}].concat(LOTO_STEPS.map((t,i)=>({t,done:s.state==='locked'||s.loto>i})));
+  let cur=steps.findIndex(x=>!x.done);
+  const done=cur<0;
+  let btn;
+  if(done)btn='<button class="btn primary big" data-act="lotostep">'+(pendingJob?'Приступить к работе':'Готово')+'</button>';
+  else if(cur===0)btn='<button class="btn danger big" data-act="lotostep">Остановить линию</button>';
+  else if(cur===1&&s.rpm>3)btn='<button class="btn lock big" data-act="lotostep">Ждать остановки шнека · '+fm(s.rpm)+' об/мин</button>';
+  else btn='<button class="btn lock big" data-act="lotostep">'+esc(steps[cur].t)+'</button>';
+  openSheet('<h2>Блокировка LOTO</h2><p class="hint" style="margin-top:6px">Выполни шаги по порядку. Каждый шаг занимает время смены.</p><div class="steps">'+steps.map((x,i)=>'<div class="stp '+(x.done?'done':i===cur?'cur':'')+'"><i>'+(x.done?'✓':i+1)+'</i><span>'+esc(x.t)+'</span></div>').join('')+'</div>'+btn+'<button class="btn link" data-act="close" style="width:100%">Закрыть</button>');
+}
+function lotoStep(){
+  const s=sim;
+  if(s.state==='locked'||s.loto>=LOTO_STEPS.length){const j=pendingJob;$('#sheet').classList.remove('on');$('#back').classList.remove('on');sheetOpen=false;pendingJob=null;if(j){const r=startJob(sim,j,false);if(r&&r!=='nolock')toast('Не удалось начать работу')}ui();return}
+  if(s.state==='running'){cmdStop(s)}
+  else if(s.rpm>3){let g=0;while(s.rpm>3&&g++<40)advance(s,0.5)}
+  else{const r=lotoNext(s);if(r)toast(r)}
+  renderLoto();
+}
+
+/* ---------- сведения об узлах ---------- */
+function detail(c){
+  const s=sim,m=s.m,R=[],fl=(v,w,a)=>v>=a?'alarm':v>=w?'warn':'';
+  let tip='',jobs=[],extra='';
+  switch(c){
+  case 'hopper':
+    R.push(['Подача сырья',fm(m.feed*100)+'%',m.feed<0.6?'alarm':m.feed<0.85?'warn':'']);R.push(['Доля дроблёнки (реграйнда)','30%','']);
+    tip='Толщина падает при тех же оборотах, а нагрузка двигателя ниже обычной? Проверь, поступает ли сырьё из бункера.';jobs=['bridge'];break;
+  case 'screw':{
+    measZ(s).forEach(z=>{const bad=(z.meas<1)||Math.abs(z.z-z.sp)>12;R.push(['Зона '+(z.i+1)+' · уставка '+fm(z.sp)+' °C',(z.meas<1?'нет сигнала':fm(z.meas)+' °C')+' · ТЭН '+fm(z.cur,1)+' А ('+fm(z.dem)+'%)',(z.meas<1||Math.abs(z.z-z.sp)>25)?'alarm':bad?'warn':''])});
+    R.push(['Температура расплава',fm(m.Tm)+' °C',(m.Tm<212||m.Tm>248)&&s.rpm>5?'warn':'']);R.push(['Обороты шнека',fm(s.rpm)+' об/мин','']);
+    tip='Сравни температуру зоны и ток ТЭН. Нет тока при просьбе 100% мощности — сгорел ТЭН. Показание 0 °C при перегреве расплава — обрыв термопары.';jobs=['tc','heater'];break}
+  case 'motor':
+    R.push(['Нагрузка',fm(m.L*100)+'%',m.L>1.05?'alarm':m.L>0.95?'warn':'']);R.push(['Ток',fm(180*m.L)+' А','']);R.push(['Температура обмотки',fm(s.tm)+' °C',s.tm>125?'alarm':s.tm>110?'warn':'']);
+    tip='Высокая температура при нормальной нагрузке — проблема охлаждения двигателя. Высокая нагрузка — смотри давление расплава и сетки.';jobs=['fan'];break;
+  case 'gear':
+    R.push(['Температура масла',fm(s.tg)+' °C',s.tg>92?'alarm':s.tg>82?'warn':'']);R.push(['Вода охлаждения',fm(s.tw,1)+' °C',s.tw>28?'warn':'']);R.push(['Нагрузка привода',fm(m.L*100)+'%','']);
+    tip='Масло греется при нормальной нагрузке и нормальной воде? Проверь его уровень. Если греются и вода, и масло — смотри чиллер.';jobs=['gear'];break;
+  case 'die':
+    R.push(['Давление расплава',fm(m.P)+' бар',m.P>270?'alarm':m.P>240?'warn':'']);R.push(['Загрязнение сеток',fm(s.screen/0.62*100)+'% от предела',s.screen>0.55?'alarm':s.screen>0.42?'warn':'']);R.push(['Температура головки',fm(s.z[3])+' °C','']);R.push(['Разброс толщины по ширине',fm(m.spread*100,1)+'%',m.spread>0.15?'alarm':m.spread>0.08?'warn':'']);
+    tip='Давление растёт из-за загрязнения сеток. Меняй пакет по плану, пока нет аварийного останова: при пределе 280 бар линия остановится сама.';jobs=['screen'];extra='<button class="btn ghost" data-act="thick"><span>Открыть профиль толщины</span><small></small></button>';break;
+  case 'calender':
+    R.push(['Скорость линии',fm(s.v,1)+' из '+fm(s.sp.speed,1)+' м/мин',s.derate<1?'warn':'']);R.push(['Ограничение привода',fm(s.derate*100)+'%',s.derate<1?'warn':'']);R.push(['Температура валков',fm(m.Troll)+' °C',(m.Troll<45||m.Troll>60)?'warn':'']);R.push(['Зазор / толщина листа',fm(s.sp.gap,2)+' / '+(m.H===null?'—':fm(m.H,2))+' мм','']);
+    tip='Если скорость сама падает ниже уставки, привод ограничен. Причину ищи в шкафу управления.';if(s.needThread)jobs=['thread'];break;
+  case 'chill':
+    R.push(['Вода: уставка / факт',fm(s.sp.chill)+' / '+fm(s.tw,1)+' °C',s.tw>34?'alarm':s.tw>28?'warn':'']);R.push(['Лист на выходе',fm(m.Tout)+' °C',m.Tout>75?'alarm':m.Tout>60?'warn':'']);R.push(['Температура валков',fm(m.Troll)+' °C','']);
+    tip='Вода теплее уставки, хотя чиллер включён? Смотри чистоту конденсатора. Днём в жару ему тяжелее.';jobs=['foul'];break;
+  case 'roll':
+    m.vib.forEach((v,i)=>R.push(['Ролик '+(i+1)+', вибрация',fm(v,1)+' мм/с',v>7?'alarm':v>4?'warn':'']));
+    R.push(['Вытяжка',fm(s.sp.draw,1)+'%',(s.sp.draw<99.5||s.sp.draw>101.5)?'warn':'']);R.push(['Царапины на листе',fm(m.scratch/0.35*35)+'%',m.scratch>0.1?'warn':'']);
+    tip='Найди ролик с повышенной вибрацией: он царапает лист, а при заклинивании порвёт его.';jobs=['bearing'];break;
+  case 'gauge':
+    R.push(['Показание толщиномера',fm(s.gauge,3)+' мм',Math.abs(s.gauge-1)>0.08?'alarm':Math.abs(s.gauge-1)>0.04?'warn':'']);R.push(['Автокоррекция оборотов',(s.corr>=0?'+':'')+fm(s.corr*100,1)+'%',Math.abs(s.corr)>0.03?'warn':'']);
+    tip='Толщиномер может дрейфовать. Автомат тогда «уверенно» держит неверную толщину. Сравни с микрометром. Если автомат сильно подкручивает обороты, а лист не такой, как показывает прибор, откалибруй его.';
+    extra='<button class="btn ghost" data-act="mic"><span>Замерить микрометром</span><small></small></button><button class="btn ghost" data-act="cal"><span>Калибровать толщиномер</span><small></small></button>';break;
+  case 'wind':
+    R.push(['Натяжение: уставка / факт',fm(s.sp.tension)+' / '+fm(m.tenA)+'%',(m.tenA<45||m.tenA>75)?'warn':'']);R.push(['Текущий рулон',fm(s.roll.len)+' из '+ROLL_LEN+' м','']);
+    const ra=s.rolls.filter(r=>r.q>=0.9).length,rb=s.rolls.filter(r=>r.q<0.9&&r.q>=0.6).length,rc=s.rolls.filter(r=>r.q<0.6).length;
+    R.push(['Готово рулонов',s.rolls.length+' · A '+ra+' · B '+rb+' · брак '+rc,'']);
+    tip='Фактическое натяжение ниже уставки при исправной настройке? Проверь пневмовал: он теряет давление.';jobs=['air'];break;
+  case 'elec':
+    R.push(['Температура шкафа',fm(s.tcab)+' °C',s.tcab>54?'alarm':s.tcab>45?'warn':'']);R.push(['Ограничение приводов',fm(s.derate*100)+'%',s.derate<1?'warn':'']);R.push(['Температура в цехе',fm(s.Ta)+' °C','']);
+    tip='Выше 45 °C приводы снижают скорость и обороты, выше 58 °C отключаются. Чаще всего виноват забитый фильтр шкафа.';jobs=['filter'];break;
+  case 'trim':
+    R.push(['Бункер обрези',fm(Math.min(1,s.bin)*100)+'%',s.bin>0.95?'alarm':s.bin>0.8?'warn':'']);R.push(['Доля обрези кромки','6% выпуска','']);
+    tip='Обрезь идёт на дробление и возврат. При заполнении бункера линия остановится. Опорожнять можно без остановки.';extra='<button class="btn ghost" data-act="bin"><span>Опорожнить бункер обрези</span><small>без остановки</small></button>';break;
+  }
+  return {R,tip,jobs,extra};
+}
+function openTile(c){
+  const s=sim,st=statuses(s)[c],d=detail(c),locked=s.state==='locked';
+  let h='<h2>'+CNAME[c]+'<span class="pill '+st.st+'">'+DN[st.st]+'</span></h2>';
+  if(st.msg)h+='<p class="hint" style="margin-top:6px">'+esc(cap(st.msg))+'</p>';
+  h+='<div class="rows">'+d.R.map(r=>'<div class="rw '+r[2]+'"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>').join('')+'</div>';
+  h+='<div class="tip">'+esc(d.tip)+'</div><div class="acts">';
+  d.jobs.forEach(id=>{h+='<button class="btn '+(locked?'lock':'ghost')+'" data-act="job" data-id="'+id+'"><span>'+esc(JOBS[id].n)+'</span><small>'+JOBS[id].min+' мин'+(locked?'':' · нужна блокировка')+'</small></button>'});
+  h+=d.extra+'<button class="btn link" data-act="close">Закрыть</button></div>';
+  openSheet(h);
+}
+
+/* ---------- итоги смены ---------- */
+const QN={th:'толщина вне допуска',pr:'профиль по ширине',mlt:'качество расплава',cool:'лист выходит горячим',roll:'температура валков',draw:'вытяжка рольганга',ten:'натяжение намотки',scr:'царапины от роликов',gap:'зазор каландра'};
+function endShift(){
+  const s=sim,o=oee(s),st=s.st,good=Math.round(st.good),money=Math.round(good*45);
+  const bestPrev=store.get('smena:best')||0;if(o.oee>bestPrev)store.set('smena:best',o.oee);
+  const verdict=o.oee>=0.7?'Отличная смена':o.oee>=0.55?'Хорошая смена':o.oee>=0.4?'Есть куда расти':'Тяжёлая смена';
+  const dts=[['Аварийные остановы',st.trip],['Ремонт и блокировки',st.lock],['Остановка оператором',st.stop],['Инцидент и расследование',st.incident]].filter(x=>x[1]>0.5);
+  const maxD=Math.max(1,...dts.map(x=>x[1]));
+  const qs=Object.keys(st.lossQ).map(k=>[QN[k]||k,st.lossQ[k]]).filter(x=>x[1]>1).sort((a,b)=>b[1]-a[1]).slice(0,4);const maxQ=Math.max(1,...qs.map(x=>x[1]));
+  let tl='';for(let b=0;b<48;b++){const x=st.timeline[b];let c='';if(x){if(x.run>=7)c=(x.qn>0&&x.q/x.qn>=0.9)?'ok':'mid';else c='stop'}tl+='<i class="'+c+'"></i>'}
+  const evs=s.sched.filter(e=>e.done).map(e=>{const f=s.F[e.k];return {n:FAULTS[e.k].n,on:f.tOn,det:f.tDet,fix:f.tFix}});
+  const ra=s.rolls.filter(r=>r.q>=0.9).length,rb=s.rolls.filter(r=>r.q<0.9&&r.q>=0.6).length,rc=s.rolls.filter(r=>r.q<0.6).length;
+  // уроки
+  const L=[];
+  if(st.incidents>0)L.push(['Блокировка LOTO — не формальность','Работа на оборудовании без блокировки закончилась несчастным случаем. Порядок один: остановить, отключить, замок и бирка, снять остаточную энергию, проверить пуск.']);
+  const late=evs.filter(e=>e.fix===null||e.fix-e.on>30);
+  if(late.length)L.push(['Реагируй раньше','Неисправностей, которые жили дольше 30 минут или остались до конца смены: '+late.length+'. Смотри на жёлтые плитки, а не только на красные: предупреждение дешевле аварии.']);
+  if(st.trips.some(t=>/Давление|Перегрузка/.test(t.why)))L.push(['Меняй сетки по плану','Аварийный останов по давлению или перегрузке двигателя — признак поздней замены сеток. Плановая замена при 240 барах дешевле аварии на 280.']);
+  if(evs.some(e=>/Толщиномер/.test(e.n)&&(e.fix===null||e.det===null)))L.push(['Проверяй толщиномер микрометром','Дрейф прибора не виден на экране. Автомат честно держит неверное значение, а лист уходит от нормы.']);
+  else if(qs.length&&/толщина/.test(qs[0][0]))L.push(['Следи за толщиной','Больше всего брака дала толщина вне допуска. Сверяй обороты и скорость по подсказке на пульте и включай автоматику.']);
+  if(!L.length)L.push(['Чистая работа','Серьёзных промахов нет. Попробуй тяжёлую сложность или подними обороты до 108–110 об/мин, сохранив качество.']);
+  $('#endBody').innerHTML=
+   '<div class="endhero"><div class="big">'+Math.round(o.oee*100)+'<span style="font-size:.4em;letter-spacing:-.04em">%</span></div><h2>'+verdict+'</h2><p>OEE смены'+(o.oee>bestPrev&&bestPrev>0?' · новый личный рекорд':'')+'</p></div>'+
+   '<div class="apq"><div><b>'+Math.round(o.A*100)+'%</b><span>Доступность</span></div><div><b>'+Math.round(Math.min(1,o.P)*100)+'%</b><span>Скорость</span></div><div><b>'+Math.round(o.Q*100)+'%</b><span>Качество</span></div></div>'+
+   '<div class="sec"><h3>Заказ</h3><div class="lb"><div><div class="t"><span>Годного листа</span><b>'+good.toLocaleString('ru-RU')+' из '+ORDER_KG.toLocaleString('ru-RU')+' кг</b></div><div class="g"><i style="width:'+Math.min(100,good/ORDER_KG*100)+'%;background:linear-gradient(90deg,#39c6ff,#5b6bff)"></i></div></div></div><p class="hint">'+(good>=ORDER_KG?'Заказ выполнен.':'Заказ не выполнен: не хватило '+(ORDER_KG-good).toLocaleString('ru-RU')+' кг.')+' Условная маржа смены: '+money.toLocaleString('ru-RU')+' ₽ (45 ₽/кг).</p></div>'+
+   '<div class="sec"><h3>Безопасность</h3><p class="hint" style="color:'+(st.incidents?'#ff8b97':'#2ee6a6')+';font-weight:700">'+(st.incidents?'Инцидентов: '+st.incidents+'. Смена не засчитывается как безопасная':'Смена без инцидентов')+'</p></div>'+
+   '<div class="sec"><h3>Ход смены</h3><div class="tl">'+tl+'</div><div class="tlg"><span style="--c:#2ee6a6">работа без потерь</span><span style="--c:#ffb020">работа с потерями</span><span style="--c:#ff4d5e">простой</span></div></div>'+
+   (dts.length?'<div class="sec"><h3>Куда ушло время</h3><div class="lb">'+dts.map(x=>'<div><div class="t"><span>'+x[0]+'</span><b>'+Math.round(x[1])+' мин</b></div><div class="g"><i style="width:'+x[1]/maxD*100+'%"></i></div></div>').join('')+'</div></div>':'')+
+   (qs.length?'<div class="sec"><h3>Куда ушло качество</h3><div class="lb">'+qs.map(x=>'<div><div class="t"><span>'+cap(x[0])+'</span><b>'+Math.round(x[1])+' кг</b></div><div class="g"><i style="width:'+x[1]/maxQ*100+'%"></i></div></div>').join('')+'</div></div>':'')+
+   '<div class="sec"><h3>Рулоны</h3><p class="hint">Готово '+s.rolls.length+': сорт A — '+ra+', сорт B — '+rb+', брак — '+rc+'</p></div>'+
+   (evs.length?'<div class="sec"><h3>Разбор неисправностей</h3><div class="rv">'+evs.map(e=>'<div><b>'+e.n+'</b>Возникла в '+hhmm(e.on)+'. '+(e.det!==null?'Замечена через '+Math.max(0,Math.round(e.det-e.on))+' мин.':'Не замечена.')+' '+(e.fix!==null?'Устранена через '+Math.round(e.fix-e.on)+' мин.':'Не устранена.')+'</div>').join('')+'</div></div>':'')+
+   '<div class="sec"><h3>Что забрать из смены</h3><ul class="les">'+L.slice(0,3).map(x=>'<li><b>'+x[0]+'</b>'+x[1]+'</li>').join('')+'</ul></div>'+
+   '<button class="btn primary big" id="bAgain">Новая смена</button><button class="btn ghost" id="bCopy">Скопировать отчёт</button>';
+  $('#bAgain').addEventListener('click',()=>{screen('start')});
+  $('#bCopy').addEventListener('click',()=>{
+    const txt=['Смена: OEE '+Math.round(o.oee*100)+'% (доступность '+Math.round(o.A*100)+'%, скорость '+Math.round(Math.min(1,o.P)*100)+'%, качество '+Math.round(o.Q*100)+'%)','Годного: '+good+' из '+ORDER_KG+' кг','Инцидентов: '+st.incidents,'Аварийных остановов: '+st.trips.length].join('\n');
+    const fb=()=>{const t=document.createElement('textarea');t.value=txt;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}document.body.removeChild(t);toast(ok?'Отчёт скопирован':'Не удалось скопировать')};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast('Отчёт скопирован'),fb);else fb();
+  });
+  $('#best').textContent='Лучший результат: OEE '+Math.round(Math.max(bestPrev,o.oee)*100)+'%';
+  screen('end');
+}
+})();
+</script>
+</body>
+</html>
